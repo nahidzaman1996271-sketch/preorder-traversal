@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Preorder Traversal Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0f1a;
+    --surface: #13162a;
+    --surface2: #1a1e35;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8eaf6;
+    --text-muted: #7c82a8;
+    --amber: #f59e0b;
+    --amber-glow: rgba(245,158,11,0.25);
+    --green: #10b981;
+    --green-glow: rgba(16,185,129,0.2);
+    --blue: #60a5fa;
+    --blue-glow: rgba(96,165,250,0.2);
+    --node-default: #1e2340;
+    --node-border: #3a3f6b;
+    --edge: #2e3460;
+    --code-bg: #0a0c18;
+    --font-ui: 'Space Grotesk', sans-serif;
+    --font-code: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(96,165,250,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,165,250,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .wrapper {
+    width: 100%;
+    max-width: 900px;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  .header h1 {
+    font-family: var(--font-code);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+  .header h1 span { color: var(--amber); }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    font-family: var(--font-code);
+  }
+
+  /* Main card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* Tree area */
+  .tree-area {
+    padding: 28px 28px 10px;
+    position: relative;
+  }
+
+  #tree-svg {
+    width: 100%;
+    display: block;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    padding: 0 28px 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-code);
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .ld-amber { background: var(--amber); box-shadow: 0 0 8px var(--amber-glow); }
+  .ld-green { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+  .ld-blue  { background: var(--blue);  box-shadow: 0 0 8px var(--blue-glow);  }
+
+  /* Divider */
+  .divider { height: 1px; background: var(--border); margin: 0 28px; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 28px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    user-select: none;
+  }
+  .btn:hover { border-color: rgba(255,255,255,0.18); background: #22273d; }
+  .btn:active { transform: scale(0.97); }
+  .btn-next {
+    background: var(--text);
+    color: var(--bg);
+    border-color: transparent;
+    font-weight: 600;
+  }
+  .btn-next:hover { background: #d0d4f0; }
+  .btn-reset { color: var(--text-muted); }
+  .step-label {
+    font-family: var(--font-code);
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
+  .step-label b { color: var(--text); font-weight: 500; }
+
+  /* Step message */
+  .step-msg-bar {
+    padding: 0 28px 12px;
+    font-family: var(--font-code);
+    font-size: 12px;
+    color: var(--text-muted);
+    min-height: 22px;
+    transition: color .3s;
+  }
+  .step-msg-bar.active { color: var(--amber); }
+
+  /* Output */
+  .output-section {
+    padding: 0 28px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .output-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-code);
+  }
+  .output-tokens {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 30px;
+    align-items: center;
+  }
+  .token {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    font-family: var(--font-code);
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transform: scale(0) translateY(8px);
+    opacity: 0;
+    transition: all .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  .token.visible {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    background: rgba(16,185,129,0.15);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .token.current-token {
+    background: rgba(245,158,11,0.18);
+    border-color: var(--amber);
+    color: var(--amber);
+    box-shadow: 0 0 12px var(--amber-glow);
+  }
+
+  /* Code section */
+  .code-section {
+    border-top: 1px solid var(--border);
+    background: var(--code-bg);
+    padding: 20px 28px;
+    font-family: var(--font-code);
+    font-size: 13px;
+    line-height: 2;
+  }
+  .code-line {
+    padding: 1px 8px;
+    border-radius: 4px;
+    transition: background .25s;
+    white-space: pre;
+    display: block;
+  }
+  .code-line.highlighted {
+    background: rgba(245,158,11,0.12);
+    border-left: 2px solid var(--amber);
+    padding-left: 6px;
+  }
+  .kw  { color: #89b4fa; }
+  .fn  { color: #a6e3a1; }
+  .ty  { color: #cba6f7; }
+  .va  { color: #f38ba8; }
+  .st  { color: #a6e3a1; }
+  .cm  { color: #44476a; font-style: italic; }
+  .nu  { color: #fab387; }
+
+  /* Mnemonic footer */
+  .mnemonic {
+    padding: 14px 28px;
+    background: var(--code-bg);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-code);
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mnemonic b { color: var(--text); }
+  .mnemonic em { color: var(--blue); font-style: italic; }
+  .badge {
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.25);
+    color: var(--blue);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-style: normal;
+  }
+
+  /* SVG node transitions */
+  .tree-node-circle {
+    transition: fill .4s cubic-bezier(.4,0,.2,1),
+                stroke .4s,
+                filter .4s;
+  }
+  .tree-edge {
+    transition: stroke .4s, stroke-opacity .4s, stroke-width .4s;
+  }
+  .call-line {
+    stroke: var(--amber);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+    stroke-dashoffset: 0;
+    animation: dash 1s linear infinite;
+    opacity: 0;
+    transition: opacity .4s;
+  }
+  .call-line.active { opacity: 1; }
+  @keyframes dash { to { stroke-dashoffset: -20; } }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    height: 3px;
+    background: var(--border);
+  }
+  .progress-bar-fill {
+    height: 3px;
+    background: linear-gradient(90deg, var(--amber), var(--green));
+    transition: width .4s cubic-bezier(.4,0,.2,1);
+    border-radius: 0 2px 2px 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <div>
+      <div class="subtitle">// binary tree algorithm</div>
+      <h1><span>preorder</span> traversal — visualized</h1>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+    </div>
+
+    <div class="tree-area">
+      <svg id="tree-svg" viewBox="0 0 680 300">
+        <defs>
+          <filter id="glow-amber" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Edges -->
+        <line id="e12" class="tree-edge" x1="340" y1="58" x2="218" y2="148" stroke="#2e3460" stroke-width="1.5"/>
+        <line id="e13" class="tree-edge" x1="340" y1="58" x2="462" y2="148" stroke="#2e3460" stroke-width="1.5"/>
+        <line id="e24" class="tree-edge" x1="218" y1="168" x2="130" y2="248" stroke="#2e3460" stroke-width="1.5"/>
+        <line id="e25" class="tree-edge" x1="218" y1="168" x2="306" y2="248" stroke="#2e3460" stroke-width="1.5"/>
+        <line id="e36" class="tree-edge" x1="462" y1="168" x2="374" y2="248" stroke="#2e3460" stroke-width="1.5"/>
+        <line id="e37" class="tree-edge" x1="462" y1="168" x2="550" y2="248" stroke="#2e3460" stroke-width="1.5"/>
+
+        <!-- Call stack animated dashed lines (parent→child) -->
+        <line id="cl12" class="call-line" x1="340" y1="58" x2="218" y2="148"/>
+        <line id="cl24" class="call-line" x1="218" y1="168" x2="130" y2="248"/>
+        <line id="cl25" class="call-line" x1="218" y1="168" x2="306" y2="248"/>
+        <line id="cl13" class="call-line" x1="340" y1="58" x2="462" y2="148"/>
+        <line id="cl36" class="call-line" x1="462" y1="168" x2="374" y2="248"/>
+        <line id="cl37" class="call-line" x1="462" y1="168" x2="550" y2="248"/>
+
+        <!-- Nodes: cx, cy defined consistently -->
+        <!-- Node 1 -->
+        <g id="n1">
+          <circle class="tree-node-circle" cx="340" cy="38" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="340" y="44" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">1</text>
+        </g>
+        <!-- Node 2 -->
+        <g id="n2">
+          <circle class="tree-node-circle" cx="218" cy="158" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="218" y="164" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">2</text>
+        </g>
+        <!-- Node 3 -->
+        <g id="n3">
+          <circle class="tree-node-circle" cx="462" cy="158" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="462" y="164" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">3</text>
+        </g>
+        <!-- Node 4 -->
+        <g id="n4">
+          <circle class="tree-node-circle" cx="130" cy="258" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="130" y="264" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">4</text>
+        </g>
+        <!-- Node 5 -->
+        <g id="n5">
+          <circle class="tree-node-circle" cx="306" cy="258" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="306" y="264" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">5</text>
+        </g>
+        <!-- Node 6 -->
+        <g id="n6">
+          <circle class="tree-node-circle" cx="374" cy="258" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="374" y="264" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">6</text>
+        </g>
+        <!-- Node 7 -->
+        <g id="n7">
+          <circle class="tree-node-circle" cx="550" cy="258" r="28" fill="#1e2340" stroke="#3a3f6b" stroke-width="1.5"/>
+          <text x="550" y="264" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="16" font-weight="600" fill="#e8eaf6">7</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot ld-amber"></div> Currently visiting</div>
+      <div class="legend-item"><div class="legend-dot ld-green"></div> Already printed</div>
+      <div class="legend-item"><div class="legend-dot ld-blue"></div> Waiting (in recursion stack)</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="controls">
+      <button class="btn" onclick="prevStep()">← Prev</button>
+      <button class="btn btn-next" onclick="nextStep()">Next →</button>
+      <button class="btn btn-reset" onclick="resetAll()">↺ Reset</button>
+      <span class="step-label" id="step-label">Step <b>0</b> / 13 — Press Next to start</span>
+    </div>
+
+    <div class="step-msg-bar" id="step-msg"></div>
+
+    <div class="output-section">
+      <span class="output-label">Output so far:</span>
+      <div class="output-tokens" id="output-tokens">
+        <div class="token" id="t1">1</div>
+        <div class="token" id="t2">2</div>
+        <div class="token" id="t4">4</div>
+        <div class="token" id="t5">5</div>
+        <div class="token" id="t3">3</div>
+        <div class="token" id="t6">6</div>
+        <div class="token" id="t7">7</div>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <span class="code-line" id="cl1"><span class="ty">void</span> <span class="fn">preorder</span>(<span class="ty">Node*</span> <span class="va">root</span>) {</span>
+      <span class="code-line" id="cl2">  <span class="kw">if</span> (<span class="va">root</span> != <span class="nu">NULL</span>) {</span>
+      <span class="code-line" id="cl3">    <span class="fn">printf</span>(<span class="st">"%d "</span>, root-&gt;data);  <span class="cm">// ① VISIT ROOT first</span></span>
+      <span class="code-line" id="cl4">    <span class="fn">preorder</span>(root-&gt;left);          <span class="cm">// ② go LEFT</span></span>
+      <span class="code-line" id="cl5">    <span class="fn">preorder</span>(root-&gt;right);         <span class="cm">// ③ go RIGHT</span></span>
+      <span class="code-line" id="cl6">  }  <span class="cm">// NULL → base case, return immediately</span></span>
+      <span class="code-line" id="cl7">}</span>
+    </div>
+
+    <div class="mnemonic">
+      <span>Preorder = <b>Root → Left → Right</b></span>
+      <span class="badge">mnemonic</span>
+      <em>"Visit before you descend"</em>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOTAL = 13;
+
+// steps: {current, waiting[], printed[], codeLine, msg, callLine, out[]}
+const steps = [
+  { current:null, waiting:[], printed:[], codeLine:null,   callLine:null, msg:'', out:[] },
+  { current:1,    waiting:[], printed:[], codeLine:'cl3',  callLine:'cl12',msg:'Call preorder(1) — root ≠ NULL, enter if. Print node 1.', out:[1] },
+  { current:2,    waiting:[1], printed:[1], codeLine:'cl4',callLine:'cl12',msg:'Go LEFT → preorder(root→left). Call preorder(2).', out:[1] },
+  { current:2,    waiting:[1], printed:[1], codeLine:'cl3',callLine:null,  msg:'preorder(2): root ≠ NULL, enter if. Print node 2.', out:[1,2] },
+  { current:4,    waiting:[1,2], printed:[1,2], codeLine:'cl4',callLine:'cl24',msg:'Go LEFT → preorder(root→left). Call preorder(4).', out:[1,2] },
+  { current:4,    waiting:[1,2], printed:[1,2], codeLine:'cl3',callLine:null,  msg:'preorder(4): root ≠ NULL, enter if. Print node 4.', out:[1,2,4] },
+  { current:null, waiting:[1,2], printed:[1,2,4], codeLine:'cl6',callLine:null,msg:'preorder(NULL): base case — return. Back to node 4 right, then null again. Back to node 2.', out:[1,2,4] },
+  { current:5,    waiting:[1,2], printed:[1,2,4], codeLine:'cl5',callLine:'cl25',msg:'Go RIGHT from node 2 → Call preorder(5). Print node 5.', out:[1,2,4,5] },
+  { current:3,    waiting:[1],   printed:[1,2,4,5], codeLine:'cl5',callLine:'cl13',msg:'Subtree of 2 done. Back to node 1. Go RIGHT → Call preorder(3). Print node 3.', out:[1,2,4,5,3] },
+  { current:6,    waiting:[1,3], printed:[1,2,4,5,3], codeLine:'cl4',callLine:'cl36',msg:'Go LEFT from node 3 → Call preorder(6). Print node 6.', out:[1,2,4,5,3,6] },
+  { current:null, waiting:[1,3], printed:[1,2,4,5,3,6], codeLine:'cl6',callLine:null,msg:'preorder(NULL) × 2 — base cases. Left & right of 6 are NULL. Return to node 3.', out:[1,2,4,5,3,6] },
+  { current:7,    waiting:[1,3], printed:[1,2,4,5,3,6], codeLine:'cl5',callLine:'cl37',msg:'Go RIGHT from node 3 → Call preorder(7). Print node 7.', out:[1,2,4,5,3,6,7] },
+  { current:null, waiting:[],    printed:[1,2,4,5,3,6,7], codeLine:'cl6',callLine:null,msg:'preorder(NULL) × 2 — base cases. Node 7 done. Unwind stack. All done!', out:[1,2,4,5,3,6,7] },
+  { current:null, waiting:[],    printed:[1,2,4,5,3,6,7], codeLine:null,  callLine:null,msg:'✓ Traversal complete! Output: 1  2  4  5  3  6  7', out:[1,2,4,5,3,6,7] },
+];
+
+const nodeMap = {1:'n1',2:'n2',3:'n3',4:'n4',5:'n5',6:'n6',7:'n7'};
+const callLines = ['cl12','cl24','cl25','cl13','cl36','cl37'];
+const codeLines = ['cl1','cl2','cl3','cl4','cl5','cl6','cl7'];
+// output order matches visual token order
+const outputOrder = [1,2,4,5,3,6,7];
+
+// Token ids keyed by value
+const tokenEl = {1:'t1',2:'t2',4:'t4',5:'t5',3:'t3',6:'t6',7:'t7'};
+
+let step = 0;
+
+function getCircle(nodeId) {
+  return document.querySelector('#'+nodeId+' circle');
+}
+
+function applyStep(s) {
+  // Reset all nodes
+  Object.values(nodeMap).forEach(nid => {
+    const c = getCircle(nid);
+    c.setAttribute('fill','#1e2340');
+    c.setAttribute('stroke','#3a3f6b');
+    c.setAttribute('stroke-width','1.5');
+    c.style.filter = '';
+  });
+
+  // Printed nodes
+  s.printed.forEach(n => {
+    const c = getCircle(nodeMap[n]);
+    c.setAttribute('fill','rgba(16,185,129,0.22)');
+    c.setAttribute('stroke','#10b981');
+    c.setAttribute('stroke-width','1.8');
+    c.style.filter = 'url(#glow-green)';
+  });
+
+  // Waiting nodes
+  s.waiting.forEach(n => {
+    const c = getCircle(nodeMap[n]);
+    c.setAttribute('fill','rgba(96,165,250,0.18)');
+    c.setAttribute('stroke','#60a5fa');
+    c.setAttribute('stroke-width','1.8');
+    c.style.filter = 'url(#glow-blue)';
+  });
+
+  // Current node
+  if (s.current && nodeMap[s.current]) {
+    const c = getCircle(nodeMap[s.current]);
+    c.setAttribute('fill','rgba(245,158,11,0.28)');
+    c.setAttribute('stroke','#f59e0b');
+    c.setAttribute('stroke-width','2.5');
+    c.style.filter = 'url(#glow-amber)';
+  }
+
+  // Call lines
+  callLines.forEach(cl => {
+    const el = document.getElementById(cl);
+    el.classList.toggle('active', cl === s.callLine);
+  });
+
+  // Code highlight
+  codeLines.forEach(id => {
+    document.getElementById(id).classList.remove('highlighted');
+  });
+  if (s.codeLine) {
+    document.getElementById(s.codeLine).classList.add('highlighted');
+  }
+
+  // Output tokens
+  outputOrder.forEach((val, idx) => {
+    const el = document.getElementById(tokenEl[val]);
+    const printed = s.out.includes(val);
+    const isCurrent = s.current === val;
+    el.classList.remove('visible','current-token');
+    if (printed || isCurrent) {
+      setTimeout(() => {
+        if (isCurrent) el.classList.add('current-token');
+        else el.classList.add('visible');
+      }, idx * 40);
+    }
+  });
+
+  // Step label
+  const lbl = document.getElementById('step-label');
+  const total = steps.length - 1;
+  lbl.innerHTML = `Step <b>${step}</b> / ${total}${step===0?' — Press Next to start':''}`;
+
+  // Step message
+  const msgEl = document.getElementById('step-msg');
+  msgEl.textContent = s.msg;
+  msgEl.classList.toggle('active', s.msg.startsWith('✓'));
+
+  // Progress bar
+  document.getElementById('progress-bar').style.width = (step / total * 100) + '%';
+}
+
+function nextStep() {
+  if (step < steps.length - 1) step++;
+  applyStep(steps[step]);
+}
+function prevStep() {
+  if (step > 0) step--;
+  applyStep(steps[step]);
+}
+function resetAll() {
+  step = 0;
+  applyStep(steps[0]);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  if (e.key === 'ArrowLeft') prevStep();
+  if (e.key === 'r' || e.key === 'R') resetAll();
+});
+
+applyStep(steps[0]);
+</script>
+</body>
+</html>
